@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet"
+          th:href="@{/css/home.css}" />
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+          integrity="sha512-..." crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+<body>
+<nav id="nav">
+    <ul class="left">
+        <li><img th:src="@{/img/logo-udemy.svg}" alt="Udemy Logo"></li>
+        <li>Explore</li>
+    </ul>
+    <ul class="middle">
+        <li><input type="text" placeholder="Search for anything"></li>
+    </ul>
+    <ul class="right">
+        <li>Udemy Business</li>
+        <li>Teach on Udemy</li>
+        <li>My Learning</li>
+        <li>
+            <i class="fa-solid fa-heart"></i></li>
+        <li><i class="fa-solid fa-cart-shopping"></i></i></li>
+        <li><i class="fa-regular fa-bell"></i></li>
+        <li><i class="fa-solid fa-user"></i></li>
+    </ul>
+</nav>
+<h1>Welcome to our website!</h1>
+<a th:href="@{/register}">Register</a> |
+<a th:href="@{/login}">Login</a>
+</body>
+</html>
