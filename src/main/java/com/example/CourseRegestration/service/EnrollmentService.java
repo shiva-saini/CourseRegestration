@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 @Service
 public class EnrollmentService {
@@ -40,28 +41,23 @@ public class EnrollmentService {
     }
 
     public String enrollUserInToCourse(Enrollment enrollment) throws Exception {
-        User user = userRepository.findById(enrollment.getUser_id()).get();
-        if(user == null){
-            throw new Exception("User not found!");
-        }
+        User user = userRepository.findById(enrollment.getUser_id())
+                .orElseThrow(() -> new NoSuchElementException("User not found"));
 
-        Course course = courseRepository.findById(enrollment.getCourse_id()).get();
 
-        if(course == null){
-            throw new Exception("Course not found!");
-        }
+        Course course = courseRepository.findById(enrollment.getCourse_id())
+                .orElseThrow(() -> new NoSuchElementException("Course not found"));
 
-        Institution institution = institutionRepository.findById(enrollment.getInstitution_id()).get();
 
-        if(institution == null){
-            throw new Exception("Institution not found!");
-        }
 
-        Mentor mentor = mentorRepository.findById(enrollment.getMentorId()).get();
+        Institution institution = institutionRepository.findById(enrollment.getInstitution_id())
+                .orElseThrow(() -> new NoSuchElementException("Instructor not found"));
 
-        if(mentor == null){
-            throw new Exception("Mentor not found!");
-        }
+
+
+        Mentor mentor = mentorRepository.findById(enrollment.getMentorId())
+                .orElseThrow(() -> new NoSuchElementException("Mentor not found"));
+
 
         Payment payment = new Payment();
         payment.setReceiverName(institution.getOwner());
@@ -102,7 +98,14 @@ public class EnrollmentService {
 
         emailService.sendEnrollmentEmail("shivasainisiyana2211@gmail.com",req);
 
+        //if the enrollment is success full then we need to add this user in to the buyers list of this course
+        course.getEnrolledUsers().add(user);
+        courseRepository.save(course);
+        //saving user so that added course will get updated
+        user.getCoursesBought().add(course);
+        userRepository.save(user);
         return "Enrollment successfull!";
+
 
     }
 }

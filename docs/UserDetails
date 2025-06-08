@@ -1,0 +1,75 @@
+//When user will come for registeration initially by default his role will be a buyer
+//When he will upload first course he will become seller
+//When he will buy some projects along with selling he will become both
+
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    private String name;
+
+    private Integer age;
+
+    private String email;
+
+    private String password;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 10, nullable = false)
+    private Role role = Role.BUYER;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    List<Course> bought = new ArrayList<>();
+    List<Course> uploaded = new ArrayList<>()
+
+    @Override
+    public String toString() {
+        return "User{" +
+                "id=" + id +
+                ", name='" + name + '\'' +
+                ", age=" + age +
+                ", email='" + email + '\'' +
+                ", password='" + password + '\'' +
+                ", role=" + role +
+                ", createdAt=" + createdAt +
+                '}';
+    }
+}
+
+------------------
+One-to-Many: A seller can create multiple courses.
+Many-to-Many: A buyer can purchase multiple courses, and a course can be bought by many users.
+
+
+users <--> user_course_enrollments <--> courses
+
+At the time of enrollment we will add current user in the list of buyers of the course
+At the time of upload we will add this course in the list of courses of the seller
+
+
+-----------------Course addition-------------
+At the time of course addition we will send the courseadditionrequestDTO not real course object
+In that dto we will add details like
+{
+  "title": "Spring Boot for Beginners",
+  "description": "A complete guide to Spring Boot and REST APIs.",
+  "price": 199.99,
+  "instructorId": 1
+}
+
+In the backend we will fetch instructor and add that instructor in the course and this course will be added that
+instructor(user) soldcourses list.
+
+Now we need to create add course button or form or else we can use swagger
+
+
+-------------------------------------------------------
+
+Adding functionality to upload course from user end in side user class
+
+
+user_course_enrollments; this is for user and course only it is not related to instructor or mentor

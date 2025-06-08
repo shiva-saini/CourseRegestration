@@ -1,5 +1,6 @@
 package com.example.CourseRegestration.controller;
 
+import com.example.CourseRegestration.dtos.AddCourseRequestDto;
 import com.example.CourseRegestration.entity.Course;
 import com.example.CourseRegestration.service.CourseService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,7 +22,7 @@ public class CourseController {
     }
 
     @PostMapping("/add")
-    public ResponseEntity<String> addCourse(@RequestBody Course course){
+    public ResponseEntity<String> addCourse(@RequestBody AddCourseRequestDto course) throws Exception {
         String res = courseService.addCourse(course);
         return new ResponseEntity<>(res, HttpStatus.OK);
     }
