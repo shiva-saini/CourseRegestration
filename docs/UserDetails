@@ -73,3 +73,18 @@ Adding functionality to upload course from user end in side user class
 
 
 user_course_enrollments; this is for user and course only it is not related to instructor or mentor
+
+
+1) https://github.com/shiva-saini/CourseRegestration.git
+2) git pull origin main
+3)git pull origin main
+4) git merge shiva
+5) git add .
+6) git commit
+7) git push origin main
+
+
+git checkout main
+git pull origin main
+git merge shiva
+git push origin main
