@@ -88,3 +88,293 @@ git checkout main
 git pull origin main
 git merge shiva
 git push origin main
+
+
+
+----------------jwt authentication-------------------
+1) I have commented login.html because jwt token comes in the api request way so we can not take it through login form and access from backend
+// there has to be some front - end technology which will take user name and password from form and send it through api call
+
+2) ----------steps----------
+
+1) The frontend (HTML/Thymeleaf/JavaScript) sends a POST request to your backend:
+    {
+      "userName": "joe123@gmail.com",
+      "password": "123456"
+    }
+
+2) Your controller receives the JSON, maps it to an object, and tries to authenticate it:
+   authenticationManager.authenticate(
+     new UsernamePasswordAuthenticationToken(userName, password)
+   );
+3) What happens here?
+   a) UsernamePasswordAuthenticationToken is a standard Spring Security object that wraps your credentials.
+   b) It is passed to AuthenticationManager, which delegates to AuthenticationProvider.
+
+   all the required beans will be created in the SecurityConfig class itself
+    SecurityFilterChain
+    AuthenticationProvider
+    PasswordEncoder
+    AuthenticationManager
+    ----------------------------------------
+
+         @Bean
+            public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+                http
+                        .csrf(csrf -> csrf.disable())  // disable CSRF for simplicity, enable for prod
+                        .authorizeHttpRequests(auth -> auth
+                                .requestMatchers("/", "/home", "/register", "/login", "/css/**", "/js/**").permitAll()
+                                .anyRequest().authenticated()
+                        )
+                        .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                        .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                        .logout(logout -> logout.permitAll());
+
+
+                return http.build();
+            }
+
+        @Bean
+        public AuthenticationProvider authenticationProvider() {
+            DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+            provider.setUserDetailsService(customUserDetailsService);
+            provider.setPasswordEncoder(passwordEncoder());
+            return provider;
+        }
+
+        @Bean
+        public PasswordEncoder passwordEncoder() {
+            return new BCryptPasswordEncoder(); // passwords must be encoded with this
+        }
+
+        @Bean
+        public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+            return config.getAuthenticationManager();
+        }
+
+    /////////////// Detail of all the beans what they are doing and how they are doing----------
+
+    1) Details about  SecurityFilterChain
+
+       a ) When request will come it will check whether it comes under permitAll that means not auth token is required
+       for this request so there will not be any token check and all.
+       b ) When request will come it will check if it is not a pemitAll request then it will call the filter with given details and try to validate or create token
+          for future validation. and filter it using jwtfilter and usernamepasswordfilter for the authentication.
+
+    -------------///////////about JwtRequestFilter how it works /////////////////------------
+
+    1) JwtRequestFilter is a class which extends OncePerRequestFilter class (public class JwtRequestFilter extends OncePerRequestFilter)
+        because we are using stateless session mean for each and every request it will authenticate user using token.
+
+        ///////////////////////////////working///////////////////////////////
+
+        It will take request , response and filterchain object
+        --1) It will check whethere request contains a Authorization header if yes then it will be containing other details other wise not
+          2) If it contains header then it will check whether Bearer token is there or not if not it will not do anything and deny the access.
+          3) If token is there it will validate token by extracting the userName and password from the token and providing it to UsernamePasswordAuthenticationToken() method
+             authentication manager will validate the details using AuthenticationProvide() by passing the UserDetails object classs inside DaoAuthenticationProvider class.
+
+          4) if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) if userName is not null and token is not already there in SecurityContextHolder
+              the it will validate the token and set it in the context for the future till expiration date.
+          5) Then it will call the next method what ever is needed.
+
+        @Override
+            protected void doFilterInternal(HttpServletRequest request,
+                                            HttpServletResponse response,
+                                            FilterChain filterChain) throws ServletException, IOException, java.io.IOException {
+                final String authHeader = request.getHeader("Authorization");
+
+                if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                    String token = authHeader.substring(7);
+                    String username = jwtUtil.extractUsername(token);
+
+                    if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                        UserDetails userDetails = null;
+                        try {
+                            userDetails = userDetailsService.loadUserByUsername(username);
+                        } catch (Exception e) {
+                            logger.error("JWT Filter: User not found or error loading user", e);
+                            // optionally return 401 if needed
+                        }
+                        if (jwtUtil.isTokenValid(token, userDetails)) {
+                            UsernamePasswordAuthenticationToken authToken =
+                                    new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+
+                            authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                            SecurityContextHolder.getContext().setAuthentication(authToken);
+                        }
+                    }
+                }
+                filterChain.doFilter(request, response);
+            }
+
+
+
+
+    -------------------/////////// AuthenticationProvider working ///////////////////////------------
+
+    1) AuthenticaionManager calls it internally behind the scene
+
+        @Bean
+            public AuthenticationProvider authenticationProvider() {
+                DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+                provider.setUserDetailsService(customUserDetailsService);
+                provider.setPasswordEncoder(passwordEncoder());
+                return provider;
+            }
+
+        It will create new Class object DaoAuthenticationProvider() and in this we will set the
+        customUserDetailsService object so that it will take user details from there and authenticate and provide
+        the info to the authentication manager whether the details are correct or not based on the details provided
+        by user in UsernamePasswordAuthenticationToken(username,password) and stored in db are same or valid or not.
+
+        Note: we are setting the passwordEncode so the it will be able to bcrypt the password internally provided by user as a plain text
+
+
+4) If all the things are correct then token will be generated using jwtUtil class.
+
+    //////////////////////  jwtutil class ///////////////////////////////////////////////////////
+    private static final String SECRET_KEY = "shiva_secret_which_is_at_least_32_characters_long";
+
+        private Key getSigningKey() {
+            return Keys.hmacShaKeyFor(SECRET_KEY.getBytes()); // using hmac algo
+        }
+
+        // Token validity: 24 hours
+        private static final long EXPIRATION_TIME = 1000 * 60 * 60 * 24;
+
+        public String generateToken(String username) {
+            Map<String,Object> claims = new HashMap<>(); // we have to write it by our own if we want to pass some custom claims
+            return createToken(claims,username); // this will create token based on the claims and subject(userName in our case)
+        }
+
+
+       // this method will create token and set its payload (issuedAt, username, expirationdate )
+        private String createToken(Map<String,Object> claims,String subject){
+            return Jwts.builder()
+                    .claims(claims)
+                    .subject(subject)
+                    .issuedAt(new Date(System.currentTimeMillis()))
+                    .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10))
+                    .signWith(getSigningKey())
+                    .compact();
+
+        }
+
+        // this will extract username from the token it is an in-built method
+        public String extractUsername(String token) {
+            return extractAllClaims(token).getSubject();
+        }
+
+        // This will validate the token based on the user name and expiration date (in-built method)
+        public Boolean validateToken(String token, String username) {
+            return extractUsername(token).equals(username) && !isTokenExpired(token);
+        }
+        // it is used to extract claims from the token
+        private Claims extractAllClaims(String token) {
+            return Jwts.parser()
+                    .verifyWith((SecretKey) getSigningKey())
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+        }
+
+        // It will give the bool value
+        private Boolean isTokenExpired(String token) {
+            return extractAllClaims(token).getExpiration().before(new Date());
+        }
+
+        //This will validate token (in-built method)
+        public boolean isTokenValid(String token, UserDetails userDetails) {
+            final String username = extractUsername(token);
+            return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
+        }
+
+
+
+///////////////////When user call method other than authentication with token ////////////////
+
+1) You’ve registered your JwtFilter in SecurityFilterChain:
+   // call the api and do filter method will call this before spring security will call it own security method
+
+   .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+
+   This filter runs before Spring Security checks authorization.
+
+2) Your JwtFilter extracts and validates the token
+
+
+//////////////////summary/////////////////////////////
+
+What's happening?
+✅ Authorization header is checked
+
+✅ JWT is parsed and validated
+
+✅ Username is extracted
+
+✅ User is loaded from DB
+
+✅ Authentication object is created and stored in SecurityContextHolder
+
+So now, Spring thinks this user is logged in for the duration of this request.
+
+
+------------------------
+
+
+Spring Security checks authorization
+Now, your controller method like this:
+
+@GetMapping("/api/user/profile")
+@PreAuthorize("hasRole('USER')")
+public UserProfile getUserProfile() {
+    ...
+}
+
+
+is protected by @PreAuthorize. Since the authentication is set, access is allowed.
+
+✅ 5. Controller handles the request
+Spring passes the request to your controller because:
+
+User is authenticated (from JWT)
+
+User has required role/authority
+
+
+
+---------------
+
+If the token is invalid/expired:
+jwtUtil.validateToken() fails
+
+No Authentication is set in SecurityContextHolder
+
+Spring denies the request and sends 401 Unauthorized
+
+
+
+///////////////////////////////
+
+Client ----(JWT token)----> JwtFilter ----> SecurityContextHolder
+                     |                       |
+                     | validate              | (If valid)
+                     |                       v
+               JwtUtil.extractUsername() ---> Controller method allowed
+
+
+
+-----------------------------------------------------------------
+
+✅ TL;DR
+The JWT is passed in every request’s header.
+
+A custom filter (JwtFilter) extracts and validates it.
+
+If valid, user is authenticated for that request.
+
+Spring uses that info to allow or block access based on roles.
+
+
+
